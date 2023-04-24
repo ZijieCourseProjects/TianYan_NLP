@@ -1,39 +1,43 @@
-from basis_embedding import *
-import basis_embedding
+from embed import basis_embedding
+from embed.basis_embedding import *
+
 _KEY_TYPES = (str, int, np.integer)
 _EXTENDED_KEY_TYPES = (str, int, np.integer, np.ndarray)
+
+
 def _ensure_list(value):
-    #确保输入为列表
+    # 确保输入为列表
     if value is None:
         return []
     if isinstance(value, _KEY_TYPES) or (isinstance(value, ndarray) and len(value.shape) == 1):
         return [value]
     return value
 
+
 def fastTextWordEmbedding():
     """
     Read the pre-trained model and return it
     :return: An object of the Vector class, containing the trained model
     """
-    return readWordEmbedding("my_model1.bin")
+    return readWordEmbedding(os.path.join(os.path.dirname(__file__), "embed/pretrained_model.bin"))
 
 
-def doc2sequence(source,documents,PaddingDirection=None,PaddingValue=0,Length='longest'):
+def doc2sequence(source, documents, PaddingDirection=None, PaddingValue=0, Length='longest'):
     """
         Convert documents to sequences for deep learning
         :param source: A document
         :param documents: documents, e.g. ['thou art bud never art art','art art bud bud'],'thou art bud never art art','test.txt'
         :param PaddingDirection: the direction for padding, e.g. 'left' ,'right' , None
-        :param Paddingvalue: the value for padding, e.g. 0
+        :param PaddingValue: the value for padding, e.g. 0
         :param Length: the length of list, e.g. 'longest','shortest',100
         :return: the sequences for input
         """
     list = _ensure_list(documents)
-    ans_list=[]
+    ans_list = []
     ans = []
     if isinstance(source, dictionary):
         for temp in list:
-            ans_list=[source.doc2bow(temp.lower().split())]
+            ans_list = [source.doc2bow(temp.lower().split())]
             for li in ans_list:
                 t = []
                 for temp, temp1 in li:
@@ -49,36 +53,36 @@ def doc2sequence(source,documents,PaddingDirection=None,PaddingValue=0,Length='l
                 ans.append(t)
     else:
         print("unknown input")
-    maxnum=0
-    if Length=='longest':
+    maxnum = 0
+    if Length == 'longest':
         for temp in ans:
             if maxnum < len(temp):
                 maxnum = len(temp)
-    elif Length=='shortest':
-        maxnum=len(ans[0])
+    elif Length == 'shortest':
+        maxnum = len(ans[0])
         for temp in ans:
             if maxnum > len(temp):
                 maxnum = len(temp)
     else:
-        maxnum=int(Length)
-    if PaddingDirection=='left':
-        for i in range(0,len(ans)):
-            if len(ans[i])<maxnum:
-                ans[i]=[PaddingValue]*(maxnum-len(ans[i]))+ans[i]
-    elif PaddingDirection=='right':
+        maxnum = int(Length)
+    if PaddingDirection == 'left':
         for i in range(0, len(ans)):
             if len(ans[i]) < maxnum:
-                ans[i] =  ans[i]+[PaddingValue] * (maxnum - len(ans[i]))
+                ans[i] = [PaddingValue] * (maxnum - len(ans[i])) + ans[i]
+    elif PaddingDirection == 'right':
+        for i in range(0, len(ans)):
+            if len(ans[i]) < maxnum:
+                ans[i] = ans[i] + [PaddingValue] * (maxnum - len(ans[i]))
     return ans
 
 
 def readWordEmbedding(filename):
     """
         Read word embedding from file
-        :param filename: a file name, e.g. 'my_model1.bin'
+        :param filename: a file name, e.g. 'pretrained_model.bin'
         :return: An object of the Vector class, containing the trained model
         """
-    #总起,负责处理bin文件的读入,格式为 词数 维度数 后面再接词和向量
+    # 总起,负责处理bin文件的读入,格式为 词数 维度数 后面再接词和向量
     counts = None
     with open(filename, 'rb') as fin:
         header = any2unicode(fin.readline(), encoding='utf8')
@@ -93,19 +97,21 @@ def readWordEmbedding(filename):
             word, weights = parts[0], [str(x) for x in parts[1:]]
             basis_embedding._add_word_to_kv(kv, counts, word, weights, vocab_size)
     return kv
-def writeWordEmbedding(emb,filename):
+
+
+def writeWordEmbedding(emb, filename):
     """
         Write word embedding file
         :param emb: An object of the Vector class, containing the trained model, e.g. my_model
-        :param filename: Name of the file to be written, e.g. 'my_model1.bin'
+        :param filename: Name of the file to be written, e.g. 'pretrained_model.bin'
         """
-    #向文件写入词向量,格式为 词数 维度数 后面再接词和向量
+    # 向文件写入词向量,格式为 词数 维度数 后面再接词和向量
     mode = 'wb'
     if 'count' in emb.expandos:
-        store_order_vocab_keys = sorted(emb.key_to_index.keys(), key=lambda k: -emb.get_vecattr(k,'count'))
+        store_order_vocab_keys = sorted(emb.key_to_index.keys(), key=lambda k: -emb.get_vecattr(k, 'count'))
     else:
         store_order_vocab_keys = emb.index_to_key
-    assert (len(emb.index_to_key), emb.vector_size) ==emb.vectors.shape
+    assert (len(emb.index_to_key), emb.vector_size) == emb.vectors.shape
     index_id_count = 0
     for i, val in enumerate(emb.index_to_key):
         if i != val:
@@ -115,10 +121,11 @@ def writeWordEmbedding(emb,filename):
     with open(filename, mode) as fout:
         fout.write(f"{len(emb.vectors)} {emb.vector_size}\n".encode('utf8'))
         for key in keys_to_write:
-            key_vector = word2vec(emb,key)
+            key_vector = word2vec(emb, key)
             fout.write(f"{key} {' '.join(repr(val) for val in key_vector)}\n".encode('utf8'))
 
-def ind2word(emb,lst):
+
+def ind2word(emb, lst):
     """
         Map encoding index to word
 
@@ -126,15 +133,16 @@ def ind2word(emb,lst):
         :param lst: a list of integers., e.g. 1 , 2 , [1,2,5]
         :return: words, returned as a string vector. ., e.g. ['the'] , ['the','king']
     """
-    #根据序号获取词汇
-    ans_list=[]
-    lst=_ensure_list(lst)
-    finlst=list(enumerate(emb.index_to_key,1))
+    # 根据序号获取词汇
+    ans_list = []
+    lst = _ensure_list(lst)
+    finlst = list(enumerate(emb.index_to_key, 1))
     for num in lst:
-        ans_list+=[finlst[num][1]]
+        ans_list += [finlst[num][1]]
     return ans_list
 
-def isVocabularyWord(emb,lst):
+
+def isVocabularyWord(emb, lst):
     """
         Test if word is member of word embedding or encoding
 
@@ -142,16 +150,17 @@ def isVocabularyWord(emb,lst):
         :param lst: a list of words., e.g. ['the'] , ['the','king']
         :return: Whether the word at the corresponding position exists in the vector e.g. [1] , [0,1]
         """
-    #判断是否为单词表中的单词
+    # 判断是否为单词表中的单词
     ans_list = []
     lst = _ensure_list(lst)
     for key in lst:
         val = emb.key_to_index.get(key, -1)
         if val >= 0:
-            ans_list+=[1]
+            ans_list += [1]
         else:
-            ans_list+=[0]
+            ans_list += [0]
     return ans_list
+
 
 def word2ind(emb, lst):
     """
@@ -162,22 +171,24 @@ def word2ind(emb, lst):
 
         :return: List of serial numbers of corresponding words e.g. [10] , [230,14]
         """
-    #找到词汇对应的序号
+    # 找到词汇对应的序号
     ans_list = []
-    lst=_ensure_list(lst)
+    lst = _ensure_list(lst)
     for key in lst:
         val = emb.key_to_index.get(key, -1)
         if val >= 0:
-            ans_list+=[val]
+            ans_list += [val]
         else:
-            print("can not find word",key)
+            print("can not find word", key)
     return ans_list
-def wordEncoding(source,**kwargs):
-    ans=[]
+
+
+def wordEncoding(source, **kwargs):
+    ans = []
     if isinstance(source, str):
         # 输入来源为txt文件
         sen = sen_get(source)
-        a=dictionary(documents=sen)
+        a = dictionary(documents=sen)
     elif isinstance(source, list):
         # 输入为列表或长句子
         texts = [
@@ -186,9 +197,11 @@ def wordEncoding(source,**kwargs):
         ]
         a = dictionary(documents=texts)
     for value in a.token2id:
-        ans+=[value]
+        ans += [value]
     return a
-def word2vec(emb,str):
+
+
+def word2vec(emb, str):
     """
         Map word to embedding vector
 
@@ -196,11 +209,12 @@ def word2vec(emb,str):
         :param str: a list of words., e.g. 'the'
         :return: The corresponding vector of the word
         """
-    #找到词汇对应的向量
-    a=emb.get_vector(str)
+    # 找到词汇对应的向量
+    a = emb.get_vector(str)
     return a
 
-def vec2word(emb,vec,k=1):
+
+def vec2word(emb, vec, k=1):
     """
         Map embedding vector to word
 
@@ -209,7 +223,7 @@ def vec2word(emb,vec,k=1):
         :param k: The num to return, e.g. 1,5
         :return: The word that is closest to this vector , return a list if k is not 1, e.g. 'king' , ['king','queen','princess']
         """
-    #将向量转变为最接近的词汇
+    # 将向量转变为最接近的词汇
     clip_start = 0
 
     if isinstance(k, Integral) and k < 1:
@@ -246,10 +260,12 @@ def vec2word(emb,vec,k=1):
 
     if k:
         result = result[:k]
-    if k==1:
+    if k == 1:
         return result[0]
     return result
-def wordEmbeddingLayer(dimension,numWords,**kwargs):
+
+
+def wordEmbeddingLayer(dimension, numWords, **kwargs):
     """
         Word embedding layer for deep learning networks
 
@@ -261,11 +277,12 @@ def wordEmbeddingLayer(dimension,numWords,**kwargs):
         :param WeightL2Factor: L2 regularization factor for weights, e.g. 1
         :return: layer
         """
-    a=my_layer()
-    a.start(Dimension=dimension,NumWords=numWords,**kwargs)
+    a = my_layer()
+    a.start(Dimension=dimension, NumWords=numWords, **kwargs)
     return a
 
-def trainWordEmbedding(source,**kwargs):
+
+def trainWordEmbedding(source, **kwargs):
     """
         Train word embedding
 
@@ -284,14 +301,14 @@ def trainWordEmbedding(source,**kwargs):
         :return: Output word embedding, returned as a Vector object.
         """
     if isinstance(source, str):
-        #输入来源为txt文件
-        sen=sen_get(source)
-        #print(sen)
-        a=Word2Vec(sentences=sen,**kwargs)
+        # 输入来源为txt文件
+        sen = sen_get(source)
+        # print(sen)
+        a = Word2Vec(sentences=sen, **kwargs)
         return a.wv
     elif isinstance(source, list):
-        #输入为列表或长句子
-        a=Word2Vec(sentences=source,**kwargs)
+        # 输入为列表或长句子
+        a = Word2Vec(sentences=source, **kwargs)
         return a.wv
 
 #

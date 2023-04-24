@@ -1,36 +1,36 @@
-
-from numbers import Integral
-from smart_open import open
-import numpy as np
-from numpy import (
-    dot, float32 as REAL,  array, zeros, vstack,
-    ndarray, dtype,  frombuffer,
-)
-from timeit import default_timer
-import math
-import re
-import scipy.sparse
-from scipy.linalg import get_blas_funcs
+import heapq
 import itertools
-from collections import defaultdict
-import unicodedata
+import math
 import os
+import platform
+import re
 import sys
+import threading
+import unicodedata
+from collections import defaultdict, namedtuple
 from copy import deepcopy
 from datetime import datetime
-import platform
-import threading
-import itertools
-import copy
-import heapq
-from collections import defaultdict, namedtuple
-from queue import Queue, Empty
-#import model_load
+from numbers import Integral
+from queue import Queue
+from timeit import default_timer
+
+import numpy as np
+import scipy.sparse
+from numpy import (
+    dot, float32 as REAL, array, zeros, vstack,
+    ndarray, dtype, frombuffer,
+)
+from scipy.linalg import get_blas_funcs
+from smart_open import open
+
+# import model_load
 _KEY_TYPES = (str, int, np.integer)
 _EXTENDED_KEY_TYPES = (str, int, np.integer, np.ndarray)
 PAT_ALPHABETIC = re.compile(r'(((?![\d])\w)+)', re.UNICODE)
+
+
 class Vectors():
-    #保存词向量
+    # 保存词向量
     def __init__(self, vector_size, count=0, dtype=np.float32):
         self.vector_size = vector_size
         self.index_to_key = [None] * count
@@ -39,8 +39,10 @@ class Vectors():
         self.vectors = zeros((count, vector_size), dtype=dtype)
         self.norms = None
         self.expandos = {}
+
     def __len__(self):
         return len(self.index_to_key)
+
     def doc2bow(self, document):
         counter = defaultdict(int)
         for w in document:
@@ -49,6 +51,7 @@ class Vectors():
         result = {token2id[w]: freq for w, freq in counter.items() if w in token2id}
         result = sorted(result.items())
         return result
+
     def fill_norms(self, force=False):
         if self.norms is None or force:
             self.norms = np.linalg.norm(self.vectors, axis=1)
@@ -58,6 +61,7 @@ class Vectors():
         self.vectors = prep_vectors(target_shape, prior_vectors=self.vectors, seed=seed)
         self.allocate_vecattrs()
         self.norms = None
+
     def sort_by_descending_frequency(self):
         if not len(self):
             return  # noop if empty
@@ -72,7 +76,7 @@ class Vectors():
         self.key_to_index = {word: i for i, word in enumerate(self.index_to_key)}
 
     def allocate_vecattrs(self, attrs=None, types=None):
-        #分配,准备词向量读入
+        # 分配,准备词向量读入
         if attrs is None:
             attrs = list(self.expandos.keys())
             types = [self.expandos[attr].dtype for attr in attrs]
@@ -91,11 +95,13 @@ class Vectors():
             prev_count = len(prev_expando)
             self.expandos[attr] = np.zeros(target_size, dtype=prev_expando.dtype)
             self.expandos[attr][: min(prev_count, target_size), ] = prev_expando[: min(prev_count, target_size), ]
+
     def has_index_for(self, key):
-        #存在该词汇
+        # 存在该词汇
         return self.get_index(key, -1) >= 0
+
     def add_vectors(self, keys, weights, extras=None, replace=False):
-        #向类中添加词和对应向量
+        # 向类中添加词和对应向量
         if isinstance(keys, _KEY_TYPES):
             keys = [keys]
             weights = np.array(weights).reshape(1, -1)
@@ -120,6 +126,7 @@ class Vectors():
             self.vectors[in_vocab_idxs] = weights[in_vocab_mask]
             for attr, extra in extras:
                 self.expandos[attr][in_vocab_idxs] = extra[in_vocab_mask]
+
     def set_vecattr(self, key, attr, val):
         self.allocate_vecattrs(attrs=[attr], types=[type(val)])
         index = self.get_index(key)
@@ -130,7 +137,7 @@ class Vectors():
         return self.expandos[attr][index]
 
     def add_vector(self, key, vector):
-        #添加向量
+        # 添加向量
         target_index = self.next_index
         if target_index >= len(self.vectors) or self.index_to_key[target_index] is not None:
             target_index = len(self.vectors)
@@ -143,8 +150,9 @@ class Vectors():
             self.vectors[target_index] = vector
             self.next_index += 1
         return target_index
+
     def get_index(self, key, default=None):
-        #获取对应index
+        # 获取对应index
         val = self.key_to_index.get(key, -1)
         if val >= 0:
             return val
@@ -156,12 +164,13 @@ class Vectors():
             print("can not find word", key)
 
     def get_vector(self, key):
-        #获取对应向量
+        # 获取对应向量
         index = self.get_index(key)
         result = self.vectors[index]
 
         result.setflags(write=False)
         return result
+
 
 def prune_vocab(vocab, min_reduce, trim_rule=None):
     result = 0
@@ -172,8 +181,8 @@ def prune_vocab(vocab, min_reduce, trim_rule=None):
             del vocab[w]
     return result
 
-def prep_vectors(target_shape, prior_vectors=None, seed=0, dtype=REAL):
 
+def prep_vectors(target_shape, prior_vectors=None, seed=0, dtype=REAL):
     if prior_vectors is None:
         prior_vectors = np.zeros((0, 0))
     if prior_vectors.shape == target_shape:
@@ -186,6 +195,7 @@ def prep_vectors(target_shape, prior_vectors=None, seed=0, dtype=REAL):
     new_vectors /= vector_size
     new_vectors[0:prior_vectors.shape[0], 0:prior_vectors.shape[1]] = prior_vectors
     return new_vectors
+
 
 def keep_vocab_item(word, count, min_count, trim_rule=None):
     default_res = count >= min_count
@@ -203,6 +213,7 @@ def keep_vocab_item(word, count, min_count, trim_rule=None):
         else:
             return default_res
 
+
 class dictionary():
     def __init__(self, documents=None, prune_at=2000000):
         self.token2id = {}
@@ -214,8 +225,10 @@ class dictionary():
         self.num_nnz = 0
         if documents is not None:
             self.add_documents(documents, prune_at=prune_at)
+
     def __len__(self):
         return len(self.token2id)
+
     def add_documents(self, documents, prune_at=2000000):
         for docno, document in enumerate(documents):
             if docno % 10000 == 0:
@@ -242,6 +255,7 @@ class dictionary():
         if keep_n is not None:
             good_ids = good_ids[:keep_n]
         self.filter_tokens(good_ids=good_ids)
+
     def doc2bow(self, document, allow_update=False):
         counter = defaultdict(int)
         for w in document:
@@ -290,7 +304,6 @@ class dictionary():
         self.cfs = {idmap[tokenid]: freq for tokenid, freq in self.cfs.items()}
 
 
-
 def any2unicode(text, encoding='utf8', errors='strict'):
     if isinstance(text, str):
         return text
@@ -298,7 +311,7 @@ def any2unicode(text, encoding='utf8', errors='strict'):
 
 
 def _add_word_to_kv(kv, counts, word, weights, vocab_size):
-    #向类中补充词汇
+    # 向类中补充词汇
     if kv.has_index_for(word):
         return
     word_id = kv.add_vector(word, weights)
@@ -317,6 +330,8 @@ def simple_preprocess(doc, deacc=False, min_len=2, max_len=15):
         if min_len <= len(token) <= max_len and not token.startswith('_')
     ]
     return tokens
+
+
 def tokenize(text, lowercase=False, deacc=False, encoding='utf8', errors="strict", to_lower=False, lower=False):
     lowercase = lowercase or to_lower or lower
     text = to_unicode(text, encoding, errors=errors)
@@ -335,6 +350,7 @@ def deaccent(text):
     result = ''.join(ch for ch in norm if unicodedata.category(ch) != 'Mn')
     return unicodedata.normalize("NFC", result)
 
+
 def tokenize(text, lowercase=False, deacc=False, encoding='utf8', errors="strict", to_lower=False, lower=False):
     lowercase = lowercase or to_lower or lower
     text = to_unicode(text, encoding, errors=errors)
@@ -344,10 +360,11 @@ def tokenize(text, lowercase=False, deacc=False, encoding='utf8', errors="strict
         text = deaccent(text)
     return simple_tokenize(text)
 
-def simple_tokenize(text):
 
+def simple_tokenize(text):
     for match in PAT_ALPHABETIC.finditer(text):
         yield match.group()
+
 
 def _add_bytes_to_kv(kv, counts, chunk, vocab_size, vector_size, datatype, unicode_errors):
     start = 0
@@ -387,10 +404,15 @@ def _word2vec_read_binary(fin, kv, counts, vocab_size, vector_size, datatype, un
     if tot_processed_words != vocab_size:
         print("input error")
 
+
 def blas(name, ndarray):
     return get_blas_funcs((name,), (ndarray,))[0]
+
+
 blas_nrm2 = blas('nrm2', np.array([], dtype=float))
 blas_scal = blas('scal', np.array([], dtype=float))
+
+
 def unitvec(vec, norm='l2', return_norm=False):
     supported_norms = ('l1', 'l2', 'unique')
     if norm not in supported_norms:
@@ -461,7 +483,7 @@ def unitvec(vec, norm='l2', return_norm=False):
 
 
 def argsort(x, topn=None, reverse=False):
-    #寻找向量最接近的
+    # 寻找向量最接近的
     x = np.asarray(x)
     if topn is None:
         topn = x.size
@@ -481,6 +503,7 @@ def any2utf8(text, errors='strict', encoding='utf8'):
     # do bytestring -> unicode -> utf8 full circle, to ensure valid utf8
     return str(text, encoding, errors=errors).encode('utf8')
 
+
 to_utf8 = any2utf8
 
 
@@ -491,8 +514,10 @@ def any2unicode(text, encoding='utf8', errors='strict'):
 
 
 to_unicode = any2unicode
+
+
 def _ensure_list(value):
-    #确保输入为列表
+    # 确保输入为列表
     if value is None:
         return []
     if isinstance(value, _KEY_TYPES) or (isinstance(value, ndarray) and len(value.shape) == 1):
@@ -501,7 +526,7 @@ def _ensure_list(value):
 
 
 def readWordEmbedding(filename):
-    #总起,负责处理bin文件的读入,格式为 词数 维度数 后面再接词和向量
+    # 总起,负责处理bin文件的读入,格式为 词数 维度数 后面再接词和向量
     counts = None
     with open(filename, 'rb') as fin:
         header = any2unicode(fin.readline(), encoding='utf8')
@@ -516,14 +541,16 @@ def readWordEmbedding(filename):
             word, weights = parts[0], [str(x) for x in parts[1:]]
             _add_word_to_kv(kv, counts, word, weights, vocab_size)
     return kv
-def writeWordEmbedding(emb,filename):
-    #向文件写入词向量,格式为 词数 维度数 后面再接词和向量
+
+
+def writeWordEmbedding(emb, filename):
+    # 向文件写入词向量,格式为 词数 维度数 后面再接词和向量
     mode = 'wb'
     if 'count' in emb.expandos:
-        store_order_vocab_keys = sorted(emb.key_to_index.keys(), key=lambda k: -emb.get_vecattr(k,'count'))
+        store_order_vocab_keys = sorted(emb.key_to_index.keys(), key=lambda k: -emb.get_vecattr(k, 'count'))
     else:
         store_order_vocab_keys = emb.index_to_key
-    assert (len(emb.index_to_key), emb.vector_size) ==emb.vectors.shape
+    assert (len(emb.index_to_key), emb.vector_size) == emb.vectors.shape
     index_id_count = 0
     for i, val in enumerate(emb.index_to_key):
         if i != val:
@@ -533,50 +560,54 @@ def writeWordEmbedding(emb,filename):
     with open(filename, mode) as fout:
         fout.write(f"{len(emb.vectors)} {emb.vector_size}\n".encode('utf8'))
         for key in keys_to_write:
-            key_vector = word2vec(emb,key)
+            key_vector = word2vec(emb, key)
             fout.write(f"{key} {' '.join(repr(val) for val in key_vector)}\n".encode('utf8'))
 
-def ind2word(emb,lst):
-    #根据序号获取词汇
-    ans_list=[]
-    lst=_ensure_list(lst)
-    finlst=list(enumerate(emb.index_to_key,1))
+
+def ind2word(emb, lst):
+    # 根据序号获取词汇
+    ans_list = []
+    lst = _ensure_list(lst)
+    finlst = list(enumerate(emb.index_to_key, 1))
     for num in lst:
-        ans_list+=[finlst[num][1]]
+        ans_list += [finlst[num][1]]
     return ans_list
 
-def isVocabularyWord(emb,lst):
-    #判断是否为单词表中的单词
+
+def isVocabularyWord(emb, lst):
+    # 判断是否为单词表中的单词
     ans_list = []
     lst = _ensure_list(lst)
     for key in lst:
         val = emb.key_to_index.get(key, -1)
         if val >= 0:
-            ans_list+=[1]
+            ans_list += [1]
         else:
-            ans_list+=[0]
+            ans_list += [0]
     return ans_list
 
+
 def word2ind(emb, lst):
-    #找到词汇对应的序号
+    # 找到词汇对应的序号
     ans_list = []
-    lst=_ensure_list(lst)
+    lst = _ensure_list(lst)
     for key in lst:
         val = emb.key_to_index.get(key, -1)
         if val >= 0:
-            ans_list+=[val]
+            ans_list += [val]
         else:
-            print("can not find word",key)
+            print("can not find word", key)
     return ans_list
 
 
-def word2vec(emb,str):
-    #找到词汇对应的向量
+def word2vec(emb, str):
+    # 找到词汇对应的向量
     return emb.get_vector(str)
 
-def vec2word(emb,vec):
-    #将向量转变为最接近的词汇
-    topn=10
+
+def vec2word(emb, vec):
+    # 将向量转变为最接近的词汇
+    topn = 10
     clip_start = 0
 
     if isinstance(topn, Integral) and topn < 1:
@@ -612,16 +643,17 @@ def vec2word(emb,vec):
     ]
     return result[:topn]
 
-def fastTextWordEmbedding():
-    return readWordEmbedding("my_model1.bin")
 
-def doc2sequence(source,documents,parm1='PaddingDirection',value1=None,parm2='Paddingvalue',value2=0):
+def fastTextWordEmbedding():
+    return readWordEmbedding("pretrained_model.bin")
+
+
+def doc2sequence(source, documents, parm1='PaddingDirection', value1=None, parm2='Paddingvalue', value2=0):
     list = _ensure_list(documents)
-    ans_list=[]
     ans = []
     if isinstance(source, dictionary):
         for temp in list:
-            ans_list=[source.doc2bow(temp.lower().split())]
+            ans_list = [source.doc2bow(temp.lower().split())]
             for li in ans_list:
                 t = []
                 for temp, temp1 in li:
@@ -638,29 +670,28 @@ def doc2sequence(source,documents,parm1='PaddingDirection',value1=None,parm2='Pa
     else:
         print("unknown input")
 
-    if parm1=='PaddingDirection' and value1=='left':
-        maxnum=0
-        for temp in ans:
-            if maxnum<len(temp):
-                maxnum=len(temp)
-        for i in range(0,len(ans)):
-            if len(ans[i])<maxnum:
-                ans[i]=[value2]*(maxnum-len(ans[i]))+ans[i]
-    elif parm1=='PaddingDirection' and value1=='right':
+    if parm1 == 'PaddingDirection' and value1 == 'left':
         maxnum = 0
         for temp in ans:
             if maxnum < len(temp):
                 maxnum = len(temp)
         for i in range(0, len(ans)):
             if len(ans[i]) < maxnum:
-                ans[i] =  ans[i]+[value2] * (maxnum - len(ans[i]))
+                ans[i] = [value2] * (maxnum - len(ans[i])) + ans[i]
+    elif parm1 == 'PaddingDirection' and value1 == 'right':
+        maxnum = 0
+        for temp in ans:
+            if maxnum < len(temp):
+                maxnum = len(temp)
+        for i in range(0, len(ans)):
+            if len(ans[i]) < maxnum:
+                ans[i] = ans[i] + [value2] * (maxnum - len(ans[i]))
     return ans
-
-
 
 
 def call_on_class_only(*args, **kwargs):
     raise AttributeError('This method should be called on a class object.')
+
 
 class LineSentence:
     def __init__(self, source, max_sentence_length=10000, limit=None):
@@ -692,14 +723,15 @@ class LineSentence:
 def train_batch_cbow(model, sentences, alpha, _work, _neu1,
                      compute_loss):  # real signature unknown; restored from __doc__
     pass
+
+
 def train_batch_sg(model, sentences, alpha, _work, compute_loss):
     pass
 
-def _assign_binary_codes(wv):
 
+def _assign_binary_codes(wv):
     heap = _build_heap(wv)
     if not heap:
-
         return
 
     # recurse over the tree, assigning a binary code to each vocabulary word
@@ -721,15 +753,14 @@ def _assign_binary_codes(wv):
             stack.append((node.right, np.array(list(codes) + [1], dtype=np.uint8), points))
 
 
-
 class Word2Vec():
     def __init__(
             self, sentences=None, corpus_file=None, Dimension=100, InitialLearnRate=0.025, Window=5, MinCount=5,
-            max_vocab_size=None, sample=1e-3, seed=1, workers=3, DiscardFactor=0.0001,Model='cbow',Verbose=0,
+            max_vocab_size=None, sample=1e-3, seed=1, workers=3, DiscardFactor=0.0001, Model='cbow', Verbose=0,
             sg=0, hs=0, NumNegativeSamples=5, ns_exponent=0.75, cbow_mean=1, hashfxn=hash, epochs=5, null_word=0,
-            trim_rule=None, sorted_vocab=1, batch_words=10000, compute_loss=False, callbacks=(),UpdateRate=50,
-            comment=None, max_final_vocab=None, shrink_windows=True,LossFunction='ns',NGramRange=[3,6]
-        ):
+            trim_rule=None, sorted_vocab=1, batch_words=10000, compute_loss=False, callbacks=(), UpdateRate=50,
+            comment=None, max_final_vocab=None, shrink_windows=True, LossFunction='ns', NGramRange=[3, 6]
+    ):
         corpus_iterable = sentences
 
         self.vector_size = int(Dimension)
@@ -756,7 +787,7 @@ class Word2Vec():
         self.min_alpha_yet_reached = float(InitialLearnRate)
         self.corpus_count = 0
         self.corpus_total_words = 0
-        LossFunction=LossFunction+'hs'
+        LossFunction = LossFunction + 'hs'
         self.max_final_vocab = max_final_vocab
         self.max_vocab_size = max_vocab_size
         self.min_count = MinCount
@@ -769,7 +800,7 @@ class Word2Vec():
         if not hasattr(self, 'wv'):
             self.wv = Vectors(Dimension)
         self.wv.vectors_lockf = np.ones(1, dtype=REAL)
-        Model=Model+'ns'
+        Model = Model + 'ns'
         self.hashfxn = hashfxn
         self.seed = seed
         if not hasattr(self, 'layer1_size'):
@@ -833,6 +864,7 @@ class Word2Vec():
     def _raw_word_count(self, job):
 
         return sum(len(sentence) for sentence in job)
+
     def _job_producer(self, data_iterator, job_queue, cur_epoch=0, total_examples=None, total_words=None):
         job_batch, batch_size = [], 0
         pushed_words, pushed_examples = 0, 0
@@ -862,7 +894,7 @@ class Word2Vec():
         for _ in range(self.workers):
             job_queue.put(None)
 
-    def zeros_aligned(self,shape, dtype, order='C', align=128):
+    def zeros_aligned(self, shape, dtype, order='C', align=128):
 
         nbytes = np.prod(shape, dtype=np.int64) * np.dtype(dtype).itemsize
         buffer = np.zeros(nbytes + align, dtype=np.uint8)
@@ -879,6 +911,7 @@ class Word2Vec():
         tally = 0
 
         return tally, self._raw_word_count(sentences)
+
     def _worker_loop(self, job_queue, progress_queue):
 
         thread_private_mem = self._get_thread_working_mem()
@@ -898,7 +931,7 @@ class Word2Vec():
     def _log_epoch_progress(
             self, progress_queue=None, job_queue=None, cur_epoch=0, total_examples=None,
             total_words=None, report_delay=1.0, is_corpus_file_mode=None,
-        ):
+    ):
         example_count, trained_word_count, raw_word_count = 0, 0, 0
         start, next_report = default_timer() - 0.00001, 1.0
         job_tally = 0
@@ -935,18 +968,15 @@ class Word2Vec():
     def _log_progress(
             self, job_queue, progress_queue, cur_epoch, example_count, total_examples,
             raw_word_count, total_words, trained_word_count, elapsed
-        ):
+    ):
         return
-
-
 
     def _log_epoch_end(
             self, cur_epoch, example_count, total_examples, raw_word_count, total_words,
             trained_word_count, elapsed, is_corpus_file_mode
-        ):
+    ):
         if is_corpus_file_mode:
             return
-
 
     def _train_epoch(
             self, data_iterable, cur_epoch=0, total_examples=None, total_words=None,
@@ -1052,6 +1082,7 @@ class Word2Vec():
             f"training on {raw_word_count} raw words ({trained_word_count} effective words) "
             f"took {total_elapsed:.1f}s, {trained_word_count / total_elapsed:.0f} effective words/s"
         ))
+
     def _check_corpus_sanity(self, corpus_iterable=None, corpus_file=None, passes=1):
         """Checks whether the corpus parameters make sense."""
         if corpus_file is None and corpus_iterable is None:
@@ -1083,15 +1114,17 @@ class Word2Vec():
         corpus_count = sentence_no + 1
         self.raw_vocab = vocab
         return total_words, corpus_count
+
     def scan_vocab(self, corpus_iterable=None, corpus_file=None, progress_per=10000, workers=None, trim_rule=None):
         if corpus_file:
             corpus_iterable = LineSentence(corpus_file)
         total_words, corpus_count = self._scan_vocab(corpus_iterable, progress_per, trim_rule)
         return total_words, corpus_count
+
     def prepare_vocab(
             self, update=False, keep_raw_vocab=False, trim_rule=None,
             min_count=None, sample=None, dry_run=False,
-        ):
+    ):
         min_count = min_count or self.min_count
         sample = sample or self.sample
         drop_total = drop_unique = 0
@@ -1222,7 +1255,7 @@ class Word2Vec():
                 word_probability = 1.0
                 downsample_total += v
             if not dry_run:
-                self.wv.set_vecattr(w, 'sample_int', np.uint32(word_probability * (2**32 - 1)))
+                self.wv.set_vecattr(w, 'sample_int', np.uint32(word_probability * (2 ** 32 - 1)))
 
         if not dry_run and not keep_raw_vocab:
             self.raw_vocab = defaultdict(int)
@@ -1299,19 +1332,18 @@ class Word2Vec():
                 stack.append((node.left, np.array(list(codes) + [0], dtype=np.uint8), points))
                 stack.append((node.right, np.array(list(codes) + [1], dtype=np.uint8), points))
 
-
-    def make_cum_table(self, domain=2**31 - 1):
+    def make_cum_table(self, domain=2 ** 31 - 1):
         vocab_size = len(self.wv.index_to_key)
         self.cum_table = np.zeros(vocab_size, dtype=np.uint32)
         # compute sum of all power (Z in paper)
         train_words_pow = 0.0
         for word_index in range(vocab_size):
             count = self.wv.get_vecattr(word_index, 'count')
-            train_words_pow += count**float(self.ns_exponent)
+            train_words_pow += count ** float(self.ns_exponent)
         cumulative = 0.0
         for word_index in range(vocab_size):
             count = self.wv.get_vecattr(word_index, 'count')
-            cumulative += count**float(self.ns_exponent)
+            cumulative += count ** float(self.ns_exponent)
             self.cum_table[word_index] = round(cumulative / train_words_pow * domain)
         if len(self.cum_table) > 0:
             assert self.cum_table[-1] == domain
@@ -1372,9 +1404,12 @@ class Word2Vec():
         self.prepare_weights(update=update)
         self.add_lifecycle_event("build_vocab", update=update, trim_rule=str(trim_rule))
 
+
 class Heapitem(namedtuple('Heapitem', 'count, index, left, right')):
     def __lt__(self, other):
         return self.count < other.count
+
+
 def _build_heap(wv):
     heap = list(Heapitem(wv.get_vecattr(i, 'count'), i, None, None) for i in range(len(wv.index_to_key)))
     heapq.heapify(heap)
@@ -1385,29 +1420,34 @@ def _build_heap(wv):
         )
     return heap
 
+
 class sen_get:
-    def __init__(self,source):
-        self.source=source
+    def __init__(self, source):
+        self.source = source
+
     def __iter__(self):
         path1 = self.source
         for line in open(path1):
             yield simple_preprocess(line)
+
+
 class my_layer:
     def __init__(self):
-        Dimension=300
-        NumWords=100
-        WeightsInitializer=0.01
-        Weights={}
-        WeightLearnRateFactor=1
-        WeightL2Factor=1
-        Name=None
-        NumInputs=0
-        InputNames=None
-        NumOutputs=1
-        OutputNames=None
-        wv=None
-    def start(self,Dimension=300,NumWords=100, WeightsInitializer=0.01,Weights=None,WeightLearnRateFactor=1,
-        WeightL2Factor=1,Name=None, NumInputs=0,InputNames=None,NumOutputs=1,OutputNames=None):
+        Dimension = 300
+        NumWords = 100
+        WeightsInitializer = 0.01
+        Weights = {}
+        WeightLearnRateFactor = 1
+        WeightL2Factor = 1
+        Name = None
+        NumInputs = 0
+        InputNames = None
+        NumOutputs = 1
+        OutputNames = None
+        wv = None
+
+    def start(self, Dimension=300, NumWords=100, WeightsInitializer=0.01, Weights=None, WeightLearnRateFactor=1,
+              WeightL2Factor=1, Name=None, NumInputs=0, InputNames=None, NumOutputs=1, OutputNames=None):
         self.Dimension = Dimension
         self.NumWords = NumWords
         self.WeightsInitializer = WeightsInitializer
@@ -1419,10 +1459,12 @@ class my_layer:
         self.InputNames = InputNames
         self.NumOutputs = NumOutputs
         self.OutputNames = OutputNames
-        #print(self.Weights)
-def wordEmbeddingLayer(dimension,numWords,**kwargs):
-    a=my_layer()
-    a.start(Dimension=dimension,NumWords=numWords,**kwargs)
+        # print(self.Weights)
+
+
+def wordEmbeddingLayer(dimension, numWords, **kwargs):
+    a = my_layer()
+    a.start(Dimension=dimension, NumWords=numWords, **kwargs)
     return a
 
 # documents = [
@@ -1480,7 +1522,6 @@ def wordEmbeddingLayer(dimension,numWords,**kwargs):
 # print(a)
 
 
-
 #
 # wv=fastTextWordEmbedding()
 # writeWordEmbedding(wv,"my_model2.bin")
@@ -1514,4 +1555,3 @@ def wordEmbeddingLayer(dimension,numWords,**kwargs):
 # my_ans=vec2word(wv,vec_king+vec_woman-vec_man)
 #
 # print(my_ans)
-

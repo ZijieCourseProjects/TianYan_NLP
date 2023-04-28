@@ -21,7 +21,7 @@ class Document:
         return self.__tokens
 
     def __str__(self):
-        return str(self.tokens)
+        return str(self.tokens())
 
     def contains(self, pattern):
         return any(pattern in token for token in self.tokens())

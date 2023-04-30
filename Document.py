@@ -16,12 +16,16 @@ class Document:
         :param language:
         """
         self.__tokens = text.split(" ")
+        self.__original_text = text
 
     def tokens(self):
         return self.__tokens
 
     def __str__(self):
         return str(self.tokens)
+
+    def original_text(self):
+        return self.__original_text
 
     def contains(self, pattern):
         return any(pattern in token for token in self.tokens())
@@ -30,5 +34,5 @@ class Document:
         raise NotImplementedError()
 
 
-def tokenize_text(text, method):
+def tokenize_text(text, method=None):
     return Document(text, method)

@@ -142,8 +142,6 @@ def summarize(text, emdedding_model):
         sentences_summary = sorted(sentences_summary, key=lambda el: el[0], reverse=False)
 
     summary = "\n".join([s[1] for s in sentences_summary])
-    for s in sentence_scores_sort:
-       print(s[0], s[1], s[2])
     return sentence_scores_sort
 
 
@@ -171,8 +169,6 @@ def extractSummary(documents:Document,**kwargs):
     for s in sum_score:
        summary.append(s[1])
        score.append(s[2])
-       print(s[0], s[1], s[2])
-       break
     summary = " ".join(summary)
     return (summary,score)
 

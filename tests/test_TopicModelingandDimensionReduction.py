@@ -87,6 +87,9 @@ class Test(TestCase):
         topicIdx, score= tm.predict(bag=bow_corpus, ldamdl=lda_model)
         print(topicIdx)
         print(score)
+        # 测试得分的和是否为1，浮点数比较使用almostequal
+        for list in score:
+            self.assertAlmostEqual(sum(list), 1.0, places=5)
 
     def test_predict_document_input(self):
         num_topics = 2
@@ -94,6 +97,9 @@ class Test(TestCase):
         topicIdx, score= tm.predict(documents=document_fruit, ldamdl=lda_model)
         print(topicIdx)
         print(score)
+        # 测试得分的和是否为1，浮点数比较使用almostequal
+        for list in score:
+            self.assertAlmostEqual(sum(list), 1.0, places=5)
 
     def test_predict_matrix_input(self):
         num_topics = 2
@@ -101,6 +107,9 @@ class Test(TestCase):
         topicIdx, score= tm.predict(counts=matrix, ldamdl=lda_model)
         print(topicIdx)
         print(score)
+        # 测试得分的和是否为1，浮点数比较使用almostequal
+        for list in score:
+            self.assertAlmostEqual(sum(list), 1.0, places=5)
 
 
     def test_transform_to_lowdimension(self):
@@ -111,9 +120,12 @@ class Test(TestCase):
         dscore_lda_bag = tm.transform_to_lowdimension(ldamdl=lda_model, bag=bow_corpus)
         dscore_lda_count = tm.transform_to_lowdimension(ldamdl=lda_model, counts=matrix)
 
-        print(dscore_lda_documents)
-        print(dscore_lda_bag)
-        print(dscore_lda_count)
+        # 测试文档维度是否正确
+        self.assertEqual(dscore_lda_documents.shape, (len(document_fruit), num_topics))
+
+        self.assertEqual(dscore_lda_bag.shape, (len(bow_corpus), num_topics))
+
+        self.assertEqual(dscore_lda_count.shape, (len(matrix), num_topics))
 
         lsa_model = tm.fit_lsa(bag=bow_corpus, numComponents=num_topics)
 
@@ -121,6 +133,8 @@ class Test(TestCase):
         dscore_lsa_bag = tm.transform_to_lowdimension(lsamdl=lsa_model, bag=bow_corpus)
         dscore_lsa_documents = tm.transform_to_lowdimension(lsamdl=lsa_model, documents=document_fruit)
 
-        print(dscore_lsa_count)
-        print(dscore_lsa_bag)
-        print(dscore_lsa_documents)
+        self.assertEqual(dscore_lsa_count.shape, (len(matrix), num_topics))
+
+        self.assertEqual(dscore_lsa_bag.shape, (len(bow_corpus), num_topics))
+
+        self.assertEqual(dscore_lsa_documents.shape, (len(document_fruit), num_topics))

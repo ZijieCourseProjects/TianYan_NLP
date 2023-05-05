@@ -36,8 +36,7 @@ class Test(TestCase):
         sentence = "John is a member of BBC in France."
         document = nltk.word_tokenize(sentence)
         a = predict(mdl, document)
-        self.assertListEqual(a, [['England', 'B-LOC'], ['is', 'O'], ['out', 'O'], ['of', 'O'], ['the', 'O'],
-                                 ['European-Union', 'B-ORG'], ['.', 'O']])
+        self.assertListEqual(a, [['John', 'B-PER'], ['is', 'O'], ['a', 'O'], ['member', 'O'], ['of', 'O'], ['BBC', 'B-ORG'], ['in', 'O'], ['France', 'B-LOC'], ['.', 'O']])
 
     def test_addEntityDetails_all(self):
         sentence = "John is a member of BBC in France."

@@ -22,7 +22,7 @@ class Document:
         return self.__tokens
 
     def __str__(self):
-        return str(self.tokens)
+        return str(self.tokens())
 
     def original_text(self):
         return self.__original_text

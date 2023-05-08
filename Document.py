@@ -1,3 +1,4 @@
+import nltk
 class Document:
     """
     A tokenized document is a document represented as a collection of words (also known as tokens) which is used for text analysis.
@@ -35,4 +36,6 @@ class Document:
 
 
 def tokenize_text(text, method=None):
+    if method == 'nltk':
+        return nltk.tokenize.word_tokenize(text)
     return Document(text, method)

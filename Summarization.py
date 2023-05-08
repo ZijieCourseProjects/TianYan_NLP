@@ -185,7 +185,6 @@ def rakeKeywords(documents:Document,**kwargs):
     mytest=" ".join(documents.tokens())
     r.extract_keywords_from_text(mytest)
     p_s=r.get_ranked_phrases_with_scores()
-    print(type(p_s))
     key_w=[]
     score=[]
     tb1={}
@@ -210,7 +209,6 @@ def textrankKeyword(documents:Document,**kwargs):
     nlp = spacy.load("en_core_web_sm")
     eliminata_list_token(documents.tokens())
     mytest = " ".join(documents.tokens())
-    print(mytest)
     # add PyTextRank to the spaCy pipeline
     nlp.add_pipe("textrank")
     doc = nlp(mytest)
@@ -333,9 +331,7 @@ def cosineSimilarity(documents,queries=None):
     else:
         line=len(documents)
         q_line=len(queries)
-        print(line,q_line)
         documents=documents+queries
-        print(documents)
         countVectorizer = CountVectorizer()  # 若要过滤停用词，可在初始化模型时设置
         doc_term_matrix = countVectorizer.fit_transform(documents)  # 得到的doc_term_matrix是一个csr的稀疏矩阵
         # doc_term_matrix[doc_term_matrix>0]=1 #将出现次数大于0的token置1

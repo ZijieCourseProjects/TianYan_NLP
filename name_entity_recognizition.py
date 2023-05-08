@@ -1,7 +1,8 @@
 import numpy as np
+import os
 import nltk
 
-DATA_PATH = "dataset/train.txt"
+DATA_PATH = "entity/train.txt"
 
 np.set_printoptions(precision=4)
 
@@ -196,7 +197,7 @@ def addEntityDetails(documents):
     return list of document and its entity e.g.[['USA','location'],['Jack','person']]
     """
     m = hmmEntityModel()
-    tbl = m.dataset("dataset/train.txt")
+    tbl = m.dataset(os.path.join(os.path.dirname(__file__), "entity/train.txt"))
     mdl = trainHMMEntityModel(tbl)
     a = predict(mdl, documents)
     for i in a:
